@@ -35,6 +35,7 @@ function RaceJoiner()
     }
 
 
+
     /**
      * Parser for input array
      */
@@ -77,6 +78,7 @@ function RaceJoiner()
     }
 
 
+
     /**
      * Read finishers into an array;
      * Format is hard-coded TSV with fields place, time, and bib.
@@ -99,9 +101,9 @@ function RaceJoiner()
                 if (line.length) {
                     var fields = line.split(/\t/);
                     var racer = {
-                        place : fields[0],
+                        place : Math.floor(fields[0]),
                         time  : fields[1],
-                        bib   : fields[2]
+                        bib   : Math.floor(fields[2])
                     };
 
                     var tSegments = racer.time.match(/([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\.([0-9]+))?/);
@@ -117,6 +119,7 @@ function RaceJoiner()
             rj.run();
         });
     }
+
 
 
     /**
@@ -177,8 +180,6 @@ function RaceJoiner()
                         races[key] = { finishers : []}
                     }
 
-                    this.place = races[key].finishers.length + 1;
-
                     races[key].finishers.push(this);
                 });
             }
@@ -193,7 +194,7 @@ function RaceJoiner()
 
 
     function sortByPlace(a, b) {
-        return a.place > b.place ? 1 : (a.place < b.place ? -1 : 0);
+        return a.place - b.place;
     }
 
 
@@ -219,26 +220,51 @@ function RaceJoiner()
 
 
 
+    function secondsFormat(seconds, offset = 0)
+    {
+        var oSeconds = seconds;
+        seconds -= offset;
+
+        var h = Math.floor(seconds / 3600);
+        seconds -= h * 3600;
+
+        var m = Math.floor(seconds / 60);
+        seconds -= m * 60;
+
+        var s = Math.floor(seconds);
+        seconds -= s;
+
+        console.log(seconds);
+
+        var i = (new String(oSeconds)).match(/.*\.([0-9]+)/);
+        i = (i && 2 == i.length) ? i[1] : "000";
+
+        return h + ":" + (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s) + "." + i
+    }
+
+
+
     function timeFormat(racer, offset = 0)
     {
         if (racer.seconds) {
-            var seconds = racer.seconds - offset;
-            var h = Math.floor(seconds / 3600);
-            seconds -= h * 3600;
-
-            var m = Math.floor(seconds / 60);
-            seconds -= m * 60;
-
-            var s = Math.floor(seconds);
-            seconds -= s;
-
-            var i = racer.seconds.match(/.*\.([0-9]+)/);
-            i = (2 == i.length) ? i[1] : "000";
-
-            return h + ":" + (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s) + "." + i
+            return secondsFormat(racer.seconds, offset);
         }
 
         return racer.time;
+    }
+
+
+
+    function ageClassFormat(racer)
+    {
+        return racer.ageClass ? racer.ageClass : "";
+    }
+
+
+
+    function genderFormat(racer)
+    {
+        return racer.gender ? racer.gender : "";
     }
 
 
@@ -248,12 +274,21 @@ function RaceJoiner()
         console.log(key, offset);
         var race = races[key];
 
-        var str = '<table id="' + key + '"><thead><tr><th>PLACE</th><th>NAME</th><th>TIME</th><th>BIB</th></tr></thead><tbody>';
+        race.finishers.sort(sortByPlace);
+
+
+        var str = '<table id="' + key + '"><thead><tr><th>PLACE</th><th>NAME</th><th>BIB</th><th>AGE CLASS</th><th>GENDER</th><th>OVERALL</th><th>TIME</th><th>TIME BEHIND</th></tr></thead><tbody>';
+        var place = 1;
+        var winningSeconds = race.finishers[0].seconds - offset;
         $.each(race.finishers, function(i, racer) {
-            str += "<tr><th>" + racer.place + "</th>"
+            str += "<tr><th>" + place++ + "</th>"
                 + "<td>" + nameFormat(racer) + "</td>"
-                + "<td>" + timeFormat(racer, offset) + "</td>"
                 + "<td>" + racer.bib + "</td>"
+                + "<td>" + ageClassFormat(racer) + "</td>"
+                + "<td>" + genderFormat(racer) + "</td>"
+                + "<td>" + racer.place + "</td>"
+                + "<td>" + timeFormat(racer, offset) + "</td>"
+                + "<td>" + secondsFormat(Math.floor(racer.seconds) - Math.floor(winningSeconds), offset) + "</td>"
                 + "</tr>";
         });
         str += "</tbody></table>";
@@ -266,7 +301,6 @@ function RaceJoiner()
     function showResults()
     {
         console.log('showResults');
-        roster.sort(sortByPlace);
 
         $.each(races, function(index, value) {
             var race = $('<div class="race"></div>').prop('id', 'race_' + index).html('<h1>' + index + '</h1>');
