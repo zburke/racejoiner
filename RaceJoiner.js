@@ -104,6 +104,11 @@ function RaceJoiner()
                         bib   : fields[2]
                     };
 
+                    var tSegments = racer.time.match(/([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\.([0-9]+))?/);
+                    if (tSegments && tSegments.length) {
+                        racer.seconds = (3600 * Math.floor(tSegments[1])) + (60 * Math.floor(tSegments[2])) + Math.floor(tSegments[3]) + (tSegments[4] ? tSegments[4] : 0);
+                    }
+
                     finishers.push(racer);
                 }
             });
@@ -123,7 +128,6 @@ function RaceJoiner()
 
         $.each(roster, function() {
             var racer = this;
-            console.log(racer);
             $.each(finishers, function() {
                 var finisher = this;
                 if (racer.bib == finisher.bib) {
@@ -135,6 +139,7 @@ function RaceJoiner()
             });
         });
     }
+
 
 
     function showFilters()
@@ -162,11 +167,9 @@ function RaceJoiner()
                 $.each(roster, function() {
                     var key = "Race";
                     if (ageFilter) {
-                        console.log('adding ageFilter ', this.ageClass)
                         key += "_" + this.ageClass;
                     }
                     if (sexFilter) {
-                        console.log('adding genderFilter ', this.gender)
                         key += "_" + this.gender;
                     }
 
@@ -180,10 +183,8 @@ function RaceJoiner()
                 });
             }
             else {
-                races["mass"] = {"finishers": roster};
+                races["Everybody"] = {"finishers": roster};
             }
-
-            console.log(races);
 
             rj.run();
         });
@@ -196,7 +197,8 @@ function RaceJoiner()
     }
 
 
-    function nameFor(racer)
+
+    function nameFormat(racer)
     {
         if (racer.firstName && racer.lastName) {
             return racer.firstName + ' ' + racer.lastName;
@@ -213,7 +215,50 @@ function RaceJoiner()
         else {
             return '#' + racer.bib;
         }
+    }
 
+
+
+    function timeFormat(racer, offset = 0)
+    {
+        if (racer.seconds) {
+            var seconds = racer.seconds - offset;
+            var h = Math.floor(seconds / 3600);
+            seconds -= h * 3600;
+
+            var m = Math.floor(seconds / 60);
+            seconds -= m * 60;
+
+            var s = Math.floor(seconds);
+            seconds -= s;
+
+            var i = racer.seconds.match(/.*\.([0-9]+)/);
+            i = (2 == i.length) ? i[1] : "000";
+
+            return h + ":" + (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s) + "." + i
+        }
+
+        return racer.time;
+    }
+
+
+
+    function raceFormat(key, offset = 0)
+    {
+        console.log(key, offset);
+        var race = races[key];
+
+        var str = '<table id="' + key + '"><thead><tr><th>PLACE</th><th>NAME</th><th>TIME</th><th>BIB</th></tr></thead><tbody>';
+        $.each(race.finishers, function(i, racer) {
+            str += "<tr><th>" + racer.place + "</th>"
+                + "<td>" + nameFormat(racer) + "</td>"
+                + "<td>" + timeFormat(racer, offset) + "</td>"
+                + "<td>" + racer.bib + "</td>"
+                + "</tr>";
+        });
+        str += "</tbody></table>";
+
+        return str;
     }
 
 
@@ -223,29 +268,32 @@ function RaceJoiner()
         console.log('showResults');
         roster.sort(sortByPlace);
 
-        $.each(races, function(index, item) {
-            $('#results').append('<h1>' + index +'</h1>');
-            var str = '<table id="' + index + '" class="race"><thead><tr><th>PLACE</th><th>NAME</th><th>TIME</th><th>BIB</th></tr></thead><tbody>';
-            $.each(item.finishers, function(i, racer) {
-                str += "<tr><th>" + racer.place + "</th>"
-                    + "<td>" + nameFor(racer) + "</td>"
-                    + "<td>" + racer.time + "</td>"
-                    + "<td>" + racer.bib + "</td>"
-                    + "</tr>";
-            });
-            str += "</tbody></table>";
+        $.each(races, function(index, value) {
+            var race = $('<div class="race"></div>').prop('id', 'race_' + index).html('<h1>' + index + '</h1>');
+            race.append(raceFormat(index));
+            $('#results').append(race);
 
-            $('#results').append(str);
+            if (value.finishers[0].seconds) {
+                $('#race_' + index + ' h1').after('<div><label for="offset'+index+'">Offset Minutes</label><select id="offset'+index+'"></select></div>');
+                for (var i = 0; i < 60; i++) {
+                    $('#offset' + index).append($('<option>', {value:i, text: i}));
+                }
+
+                $('#offset'+index).change(function(){
+                    var offsetSeconds = 60 * $(this).val();
+                    $('table#' + index).replaceWith(raceFormat(index, offsetSeconds));
+                });
+            }
         });
-
 
         $('.modal').hide();
         $('#results').show();
     }
 
+
+
     this.run = function()
     {
-        console.log('running...');
         (workflow.shift())();
     }
 
