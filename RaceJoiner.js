@@ -223,7 +223,7 @@ function RaceJoiner()
     function nameFormat(racer)
     {
         if (racer.firstName && racer.lastName) {
-            return racer.firstName + ' ' + racer.lastName + ' (' + racer.interval + ')';
+            return racer.firstName + ' ' + racer.lastName;
         }
         else if (racer.name) {
             return racer.name;
