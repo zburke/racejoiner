@@ -7,6 +7,7 @@ function RaceJoiner()
     var roster    = [];
     var finishers = [];
     var races = {};
+    var interval = 0;
 
 
     /**
@@ -29,6 +30,8 @@ function RaceJoiner()
                     rosterArray.push(line.split(/\t/));
                 }
             });
+
+            interval = Math.floor($('#interval').val());
 
             rj.run();
         });
@@ -55,12 +58,13 @@ function RaceJoiner()
                 for (var j = 0; j < jmax; j++) {
                     val.push(rosterArray[j][i]);
                 }
-                $('#fields' + item).append($('<option>', {value:i, text:val.join(", ")}));
+                $('#fields' + item).append($('<option>', {value:i, text:val.join(", ") + "..."}));
             }
         });
 
         $('#fieldsSubmit').click(function(){
 
+            var intervalOffset = 0;
             $.each(rosterArray, function(index, line){
                 racer = {};
 
@@ -68,7 +72,9 @@ function RaceJoiner()
                     if ($('#fields' + field).val()) {
                         racer[field] = line[$('#fields' + field).val()]
                     }
+
                 });
+                racer.interval = intervalOffset++ * interval;
 
                 roster.push(racer);
             });
@@ -108,8 +114,12 @@ function RaceJoiner()
 
                     var tSegments = racer.time.match(/([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\.([0-9]+))?/);
                     if (tSegments && tSegments.length) {
-                        racer.seconds = (3600 * Math.floor(tSegments[1])) + (60 * Math.floor(tSegments[2])) + Math.floor(tSegments[3]) + (tSegments[4] ? tSegments[4] : 0);
+                        racer.seconds = (3600 * Math.floor(tSegments[1]))
+                            + (60 * Math.floor(tSegments[2]))
+                            + Math.floor(tSegments[3])
+                            + (tSegments[4] ? tSegments[4] : 0);
                     }
+
 
                     finishers.push(racer);
                 }
@@ -137,6 +147,11 @@ function RaceJoiner()
                     $.each(finisher, function(k, v) {
                         racer[k] = v;
                     });
+
+                    if (racer.seconds && racer.interval) {
+                        racer.seconds -= racer.interval;
+                    }
+
                     return false;
                 }
             });
@@ -199,10 +214,16 @@ function RaceJoiner()
 
 
 
+    function sortBySeconds(a, b) {
+        return a.seconds - b.seconds;
+    }
+
+
+
     function nameFormat(racer)
     {
         if (racer.firstName && racer.lastName) {
-            return racer.firstName + ' ' + racer.lastName;
+            return racer.firstName + ' ' + racer.lastName + ' (' + racer.interval + ')';
         }
         else if (racer.name) {
             return racer.name;
@@ -233,8 +254,6 @@ function RaceJoiner()
 
         var s = Math.floor(seconds);
         seconds -= s;
-
-        console.log(seconds);
 
         var i = (new String(oSeconds)).match(/.*\.([0-9]+)/);
         i = (i && 2 == i.length) ? i[1] : "000";
@@ -274,7 +293,12 @@ function RaceJoiner()
         console.log(key, offset);
         var race = races[key];
 
-        race.finishers.sort(sortByPlace);
+        if (race.finishers[0].seconds) {
+            race.finishers.sort(sortBySeconds);
+        }
+        else {
+            race.finishers.sort(sortByPlace);
+        }
 
 
         var str = '<table id="' + key + '"><thead><tr><th>PLACE</th><th>NAME</th><th>BIB</th><th>AGE CLASS</th><th>GENDER</th><th>OVERALL</th><th>TIME</th><th>TIME BEHIND</th></tr></thead><tbody>';
@@ -287,7 +311,7 @@ function RaceJoiner()
                 + "<td>" + ageClassFormat(racer) + "</td>"
                 + "<td>" + genderFormat(racer) + "</td>"
                 + "<td>" + racer.place + "</td>"
-                + "<td>" + timeFormat(racer, offset) + "</td>"
+                + "<td class='time'>" + timeFormat(racer, offset) + "</td>"
                 + "<td>" + secondsFormat(Math.floor(racer.seconds) - Math.floor(winningSeconds), offset) + "</td>"
                 + "</tr>";
         });
@@ -315,7 +339,9 @@ function RaceJoiner()
 
                 $('#offset'+index).change(function(){
                     var offsetSeconds = 60 * $(this).val();
-                    $('table#' + index).replaceWith(raceFormat(index, offsetSeconds));
+                    $('table#' + index).fadeOut('slow')
+                    $('table#' + index).replaceWith(raceFormat(index, offsetSeconds))
+                    $('table#' + index).fadeIn('slow');
                 });
             }
         });
